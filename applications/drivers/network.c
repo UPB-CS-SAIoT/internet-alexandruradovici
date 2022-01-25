@@ -14,7 +14,7 @@ char * network_get(const char *url, size_t len) {
         bool done = false;
         allow_ro_return_t ret_allow = allow_readonly(DRIVER_NUM_NETWORK, 0, url, strlen(url));
         if (ret_allow.status == TOCK_STATUSCODE_SUCCESS) {
-            allow_rw_return_t ret_allow_buffer = allow_readwrite(DRIVER_NUM_NETWORK, 0, data_buffer, strlen(len));
+            allow_rw_return_t ret_allow_buffer = allow_readwrite(DRIVER_NUM_NETWORK, 0, data_buffer, len);
             if (ret_allow_buffer.status == TOCK_STATUSCODE_SUCCESS) {
                 subscribe_return_t ret_subscribe = subscribe(DRIVER_NUM_NETWORK, 0, request_done, &done);
                 if (ret_subscribe.status == TOCK_STATUSCODE_SUCCESS) 
