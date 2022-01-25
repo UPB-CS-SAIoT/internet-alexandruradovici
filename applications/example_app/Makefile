@@ -6,6 +6,9 @@ TOCK_USERLAND_BASE_DIR = ../../libtock-c
 # External libraries used
 EXTERN_LIBS += ../drivers
 
+
+APP_HEAP_SIZE := 8192
+
 # Which files to compile.
 C_SRCS := $(wildcard *.c)
 

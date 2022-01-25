@@ -12,8 +12,11 @@ use kernel::capabilities;
 use kernel::component::Component;
 use kernel::dynamic_deferred_call::{DynamicDeferredCall, DynamicDeferredCallClientState};
 use kernel::hil::time::Counter;
+use kernel::hil::uart::{Receive, Transmit};
 use kernel::platform::{KernelResources, SyscallDriverLookup};
 use kernel::scheduler::round_robin::RoundRobinSched;
+
+use capsules::virtual_uart::UartDevice;
 
 #[allow(unused_imports)]
 use kernel::{create_capability, debug, debug_gpio, debug_verbose, static_init};
@@ -110,6 +113,8 @@ pub struct MicroBit {
     app_flash: &'static capsules::app_flash_driver::AppFlash<'static>,
     sound_pressure: &'static capsules::sound_pressure::SoundPressureSensor<'static>,
 
+    network: &'static drivers::network::Network<'static>,
+
     scheduler: &'static RoundRobinSched<'static>,
     systick: cortexm4::systick::SysTick,
 }
@@ -134,6 +139,7 @@ impl SyscallDriverLookup for MicroBit {
             capsules::buzzer_driver::DRIVER_NUM => f(Some(self.buzzer)),
             capsules::app_flash_driver::DRIVER_NUM => f(Some(self.app_flash)),
             capsules::sound_pressure::DRIVER_NUM => f(Some(self.sound_pressure)),
+            drivers::network::DRIVER_NUM => f(Some(self.network)),
             kernel::ipc::DRIVER_NUM => f(Some(&self.ipc)),
             _ => f(None),
         }
@@ -559,10 +565,26 @@ pub unsafe fn main() {
     //--------------------------------------------------------------------------
     // Process Console
     //--------------------------------------------------------------------------
-    let process_console =
-        components::process_console::ProcessConsoleComponent::new(board_kernel, uart_mux)
-            .finalize(());
-    let _ = process_console.start();
+    // let process_console =
+    //     components::process_console::ProcessConsoleComponent::new(board_kernel, uart_mux)
+    //         .finalize(());
+    // let _ = process_console.start();
+
+    let network_grant =
+        board_kernel.create_grant(drivers::network::DRIVER_NUM, &memory_allocation_capability);
+
+    let network_uart = static_init!(UartDevice<'static>, UartDevice::new(uart_mux, true));
+    network_uart.setup();
+
+    let network_buffer = static_init!([u8; 4096], [0; 4096]);
+
+    let network = static_init!(
+        drivers::network::Network<'static>,
+        drivers::network::Network::new(network_grant, network_uart, network_buffer)
+    );
+
+    network_uart.set_transmit_client(network);
+    network_uart.set_receive_client(network);
 
     //--------------------------------------------------------------------------
     // FINAL SETUP AND BOARD BOOT
@@ -591,6 +613,7 @@ pub unsafe fn main() {
         ninedof,
         buzzer,
         sound_pressure,
+        network,
         adc: adc_syscall,
         alarm,
         app_flash,
